@@ -3,7 +3,7 @@ import google.generativeai as genai
 import os
 
 # Set your API key
-os.environ["GOOGLE_API_KEY"] = "AIzaSyDay5UtjKpPhoA_SK5Viq1usydRuCMtp7k"
+os.environ["GOOGLE_API_KEY"] = "AIzaSyB7lrUkj6E5qMDQaJLkxYdClXB1ZPqx1_Q"
 genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 
 app = Flask(__name__)
@@ -12,33 +12,67 @@ app = Flask(__name__)
 model = genai.GenerativeModel("models/gemini-3-flash-preview")
 
 # Function to generate recommendations
-def generate_recommendation(dietary_preferences, fitness_goals, lifestyle_factors, dietary_restrictions,
-                            health_conditions, user_query):
+def generate_recommendation(age, gender, height, weight, dietary_preferences, fitness_goals, activity_level,
+                            lifestyle_factors, dietary_restrictions, health_conditions, budget, user_query):
     prompt = f"""
-    Can you suggest a comprehensive plan that includes diet and workout options for better fitness?
-    for this user:
-    dietary preferences: {dietary_preferences},
-    fitness goals: {fitness_goals},
-    lifestyle factors: {lifestyle_factors},
-    dietary restrictions: {dietary_restrictions},
-    health conditions: {health_conditions},
-    user query: {user_query},
+You are an expert Indian nutritionist and fitness coach. 
+Create a personalized, practical, and affordable diet and workout plan tailored specifically for an Indian user.
 
-    Based on the above user’s dietary preferences, fitness goals, lifestyle factors, dietary restrictions, and health conditions provided, create a customized plan that includes:
+User Profile:
+- Age: {age}
+- Gender: {gender}
+- Height: {height}
+- Weight: {weight}
+- Dietary Preference: {dietary_preferences} (Vegetarian / Non-Vegetarian / Eggetarian / Vegan / Jain)
+- Fitness Goal: {fitness_goals} (Weight Loss / Weight Gain / Muscle Gain / General Fitness)
+- Activity Level: {activity_level} (Sedentary / Moderate / Active)
+- Lifestyle Factors: {lifestyle_factors}
+- Dietary Restrictions: {dietary_restrictions}
+- Health Conditions: {health_conditions}
+- Budget Preference: {budget} (Low / Medium / High)
+- User Query: {user_query}
 
-    Diet Recommendations: RETURN LIST
-    5 specific diet types suited to their preferences and goals.
+Instructions:
+- Focus on Indian food habits and locally available ingredients.
+- Include simple, affordable, and easy-to-cook meals.
+- Avoid recommending expensive or foreign foods unless necessary.
+- Customize based on dietary preference (veg/non-veg/etc.).
+- Consider common Indian eating patterns (breakfast, lunch, dinner, snacks).
+- Avoid harmful or unsafe advice.
+- Keep recommendations realistic for daily Indian lifestyle.
 
-    Workout Options: RETURN LIST
-    5 workout recommendations that align with their fitness level and goals.
+Output Format (STRICT):
 
-    Meal Suggestions: RETURN LIST
-    5 breakfast ideas.
+1. Diet Recommendations (Return as a list of 5)
+   - Suggest 5 Indian diet styles or patterns (e.g., High Protein Indian Diet, South Indian Balanced Diet, etc.)
+   - Brief explanation for each
 
-    5 dinner options.
+2. Workout Plan (Return as a list of 5)
+   - Include home workouts + gym options
+   - Mention duration and frequency
 
-    Additional Recommendations: RETURN LIST
-    Any useful snacks, supplements, or hydration tips tailored to their profile.
+3. Meal Plan Suggestions
+
+   Breakfast Ideas (5 items):
+   - Include Indian options like poha, upma, paratha, oats, idli, etc.
+
+   Lunch Ideas (5 items):
+   - Include roti, sabzi, dal, rice combinations
+
+   Dinner Ideas (5 items):
+   - Light and healthy Indian dinner options
+
+4. Snacks & Additional Recommendations (Return as list)
+   - Healthy Indian snacks (roasted chana, makhana, fruits, etc.)
+   - Hydration tips
+   - Supplement suggestions (only if safe and necessary)
+
+5. Important Tips
+   - 3-5 simple lifestyle tips (sleep, consistency, water intake, etc.)
+
+Keep the tone simple, practical, and beginner-friendly.
+Avoid complex medical terminology.
+Ensure the plan is culturally relevant for an Indian user.
     """
 
     response = model.generate_content(prompt)
@@ -52,16 +86,23 @@ def index():
 def recommendations():
     if request.method == "POST":
         # Collect form data
+        age = request.form['age']
+        gender = request.form['gender']
+        height = request.form['height']
+        weight = request.form['weight']
         dietary_preferences = request.form['dietary_preferences']
         fitness_goals = request.form['fitness_goals']
+        activity_level = request.form['activity_level']
         lifestyle_factors = request.form['lifestyle_factors']
         dietary_restrictions = request.form['dietary_restrictions']
         health_conditions = request.form['health_conditions']
+        budget = request.form['budget']
         user_query = request.form['user_query']
 
         # Generate recommendations using the model
         recommendations_text = generate_recommendation(
-            dietary_preferences, fitness_goals, lifestyle_factors, dietary_restrictions, health_conditions, user_query
+            age, gender, height, weight, dietary_preferences, fitness_goals, activity_level,
+            lifestyle_factors, dietary_restrictions, health_conditions, budget, user_query
         )
 
         # Parse the results for display
@@ -69,8 +110,10 @@ def recommendations():
             "diet_types": [],
             "workouts": [],
             "breakfasts": [],
+            "lunches": [],
             "dinners": [],
-            "additional_tips": []
+            "snacks": [],
+            "tips": []
         }
 
         print("text : ", recommendations_text)
@@ -87,17 +130,23 @@ def recommendations():
             if re.search(r"Diet\s+Recommendations", stripped, re.I):
                 current_section = "diet_types"
                 continue
-            if re.search(r"Workout\s+Options", stripped, re.I):
+            if re.search(r"Workout\s+Plan", stripped, re.I) or re.search(r"Workout\s+Options", stripped, re.I):
                 current_section = "workouts"
                 continue
-            if re.search(r"Breakfast", stripped, re.I) and re.search(r"Meal", stripped, re.I):
+            if re.search(r"Breakfast", stripped, re.I):
                 current_section = "breakfasts"
+                continue
+            if re.search(r"Lunch", stripped, re.I):
+                current_section = "lunches"
                 continue
             if re.search(r"Dinner", stripped, re.I):
                 current_section = "dinners"
                 continue
-            if re.search(r"Additional\s+Recommendations", stripped, re.I) or re.search(r"Additional\s+Tips", stripped, re.I):
-                current_section = "additional_tips"
+            if re.search(r"Snacks", stripped, re.I) or re.search(r"Additional\s+Recommendations", stripped, re.I):
+                current_section = "snacks"
+                continue
+            if re.search(r"Important\s+Tips", stripped, re.I) or re.search(r"Lifestyle\s+Tips", stripped, re.I):
+                current_section = "tips"
                 continue
 
             # collect line into current section, stripping list markers
@@ -106,7 +155,7 @@ def recommendations():
                 item = re.sub(r"^[\*\-\d\.\)\s]+", "", stripped)
                 # drop common header/description lines that aren't actual items
                 lc = item.lower()
-                if re.match(r"(specific diet|workout recommendations|meal suggestions|snacks|supplements|addition(al)? tips?)", lc):
+                if re.match(r"(specific diet|workout recommendations|meal suggestions|snacks|supplements|addition(al)? tips?|hydration|breakfast|lunch|dinner|return as list)", lc):
                     continue
                 # strip trailing colons, asterisks, bold markers
                 item = re.sub(r"[\*\:]+$", "", item).strip()
